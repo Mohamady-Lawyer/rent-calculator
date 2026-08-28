@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#185fa5">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>حاسبة الزيادة السنوية للإيجار</title>
+<style>
+:root {
+  --bg: #f7f6f2;
+  --card-bg: #ffffff;
+  --text-primary: #1c1c1a;
+  --text-secondary: #6b6a66;
+  --border: #dcdad4;
+  --accent: #185fa5;
+  --result-bg: #eef2f6;
+  --error-bg: #fcebeb;
+  --error-text: #a32d2d;
+}
+
+body[data-theme="dark"] {
+  --bg: #1f1f1d;
+  --card-bg: #2a2a28;
+  --text-primary: #f2f1ee;
+  --text-secondary: #b0aea8;
+  --border: #45443f;
+  --accent: #85b7eb;
+  --result-bg: #33332f;
+  --error-bg: #4a1b1b;
+  --error-text: #f0a5a5;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+.container {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.icon-btn {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.field label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.field input {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-primary);
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.calc-btn {
+  width: 100%;
+  padding: 14px;
+  margin-top: 4px;
+  margin-bottom: 18px;
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.calc-btn:active {
+  opacity: 0.85;
+}
+
+.error-box {
+  background: var(--error-bg);
+  color: var(--error-text);
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.result-box {
+  background: var(--result-bg);
+  border-radius: 10px;
+  padding: 18px;
+  text-align: center;
+}
+
+.result-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 6px;
+}
+
+.result-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.result-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 6px 0 0;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <span class="title">حاسبة الزيادة السنوية للإيجار</span>
+    <button id="darkToggle" class="icon-btn" title="الوضع الليلي">🌙</button>
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <label for="contractDate">تاريخ بداية التعاقد</label>
+      <input type="date" id="contractDate">
+    </div>
+
+    <div class="field">
+      <label for="startRent">الأجرة وقت التعاقد (جنيه)</label>
+      <input type="number" id="startRent" step="any" placeholder="مثال: 4.5" inputmode="decimal">
+    </div>
+
+    <div class="field">
+      <label for="increaseRate">نسبة الزيادة السنوية (%)</label>
+      <input type="number" id="increaseRate" step="any" placeholder="مثال: 15" inputmode="decimal">
+    </div>
+
+    <button id="calcBtn" class="calc-btn">احسب الأجرة الحالية</button>
+
+    <div id="errorBox" class="error-box" style="display:none;"></div>
+
+    <div class="result-box">
+      <p class="result-label">الأجرة المستحقة حالياً</p>
+      <p id="resultValue" class="result-value">—</p>
+      <p id="resultSub" class="result-sub"></p>
+      <p id="lastIncreaseDate" class="result-sub"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const darkToggle = document.getElementById('darkToggle');
+const calcBtn = document.getElementById('calcBtn');
+const errorBox = document.getElementById('errorBox');
+const resultValue = document.getElementById('resultValue');
+const resultSub = document.getElementById('resultSub');
+const lastIncreaseDate = document.getElementById('lastIncreaseDate');
+
+darkToggle.addEventListener('click', () => {
+  const isDark = document.body.getAttribute('data-theme') === 'dark';
+  document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  darkToggle.textContent = isDark ? '🌙' : '☀️';
+});
+
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.style.display = 'block';
+}
+
+function clearError() {
+  errorBox.style.display = 'none';
+  errorBox.textContent = '';
+}
+
+function calcFullYearsBetween(startDate, today) {
+  let years = today.getFullYear() - startDate.getFullYear();
+  const anniversaryPassed =
+    today.getMonth() > startDate.getMonth() ||
+    (today.getMonth() === startDate.getMonth() && today.getDate() >= startDate.getDate());
+  if (!anniversaryPassed) years -= 1;
+  return Math.max(years, 0);
+}
+
+const fieldOrder = ['contractDate', 'startRent', 'increaseRate'];
+
+fieldOrder.forEach((id, index) => {
+  const el = document.getElementById(id);
+  el.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const isLast = index === fieldOrder.length - 1;
+    if (isLast) {
+      calcBtn.click();
+    } else {
+      document.getElementById(fieldOrder[index + 1]).focus();
+    }
+  });
+});
+
+calcBtn.addEventListener('click', () => {
+  clearError();
+
+  const dateStr = document.getElementById('contractDate').value;
+  const startRentStr = document.getElementById('startRent').value;
+  const rateStr = document.getElementById('increaseRate').value;
+
+  if (!dateStr) {
+    showError('من فضلك أدخل تاريخ بداية التعاقد');
+    return;
+  }
+  if (startRentStr === '' || isNaN(Number(startRentStr)) || Number(startRentStr) <= 0) {
+    showError('من فضلك أدخل قيمة صحيحة للأجرة');
+    return;
+  }
+  if (rateStr === '' || isNaN(Number(rateStr)) || Number(rateStr) < 0) {
+    showError('من فضلك أدخل نسبة زيادة صحيحة');
+    return;
+  }
+
+  const startDate = new Date(dateStr);
+  const today = new Date();
+
+  if (startDate > today) {
+    showError('تاريخ التعاقد لا يمكن أن يكون في المستقبل');
+    return;
+  }
+
+  const startRent = Number(startRentStr);
+  const rate = Number(rateStr) / 100;
+
+  const years = calcFullYearsBetween(startDate, today);
+  const finalRent = startRent * Math.pow(1 + rate, years);
+
+  resultValue.textContent = finalRent.toLocaleString('ar-EG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }) + ' جنيه';
+  resultSub.textContent = 'بعد ' + years + ' سنة زيادة';
+
+  if (years > 0) {
+    const lastIncrease = new Date(startDate);
+    lastIncrease.setFullYear(startDate.getFullYear() + years);
+    const day = String(lastIncrease.getDate()).padStart(2, '0');
+    const month = String(lastIncrease.getMonth() + 1).padStart(2, '0');
+    const year = lastIncrease.getFullYear();
+    lastIncreaseDate.textContent = 'آخر زيادة بتاريخ ' + day + '/' + month + '/' + year;
+  } else {
+    lastIncreaseDate.textContent = 'لم يتم تطبيق أي زيادة بعد';
+  }
+});if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js');
+  });
+}
+</script>
+</body>
+</html>
