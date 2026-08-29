@@ -156,6 +156,13 @@ html, body {
   color: var(--text-secondary);
   margin: 6px 0 0;
 }
+
+.section-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 20px 0 10px;
+}
 </style>
 </head>
 <body>
@@ -191,6 +198,20 @@ html, body {
       <p id="resultSub" class="result-sub"></p>
       <p id="lastIncreaseDate" class="result-sub"></p>
     </div>
+
+    <p class="section-label">إجمالي الأجرة المحصلة (مع الزيادة السنوية)</p>
+    <div class="result-box">
+      <p class="result-label">من بداية التعاقد حتى اليوم</p>
+      <p id="totalCollectedValue" class="result-value">—</p>
+      <p id="totalCollectedSub" class="result-sub"></p>
+    </div>
+
+    <p class="section-label">إجمالي الأجرة بدون أي زيادة (للمقارنة)</p>
+    <div class="result-box">
+      <p class="result-label">لو ظلت الأجرة ثابتة طوال المدة</p>
+      <p id="totalFlatValue" class="result-value">—</p>
+      <p id="totalFlatSub" class="result-sub"></p>
+    </div>
   </div>
 </div>
 
@@ -201,11 +222,24 @@ const errorBox = document.getElementById('errorBox');
 const resultValue = document.getElementById('resultValue');
 const resultSub = document.getElementById('resultSub');
 const lastIncreaseDate = document.getElementById('lastIncreaseDate');
+const totalCollectedValue = document.getElementById('totalCollectedValue');
+const totalCollectedSub = document.getElementById('totalCollectedSub');
+const totalFlatValue = document.getElementById('totalFlatValue');
+const totalFlatSub = document.getElementById('totalFlatSub');
+
+function applyTheme(theme) {
+  document.body.setAttribute('data-theme', theme);
+  darkToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+
+const savedTheme = localStorage.getItem('rentCalcTheme');
+applyTheme(savedTheme === 'dark' ? 'dark' : 'light');
 
 darkToggle.addEventListener('click', () => {
   const isDark = document.body.getAttribute('data-theme') === 'dark';
-  document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  darkToggle.textContent = isDark ? '🌙' : '☀️';
+  const newTheme = isDark ? 'light' : 'dark';
+  applyTheme(newTheme);
+  localStorage.setItem('rentCalcTheme', newTheme);
 });
 
 function showError(msg) {
@@ -225,6 +259,32 @@ function calcFullYearsBetween(startDate, today) {
     (today.getMonth() === startDate.getMonth() && today.getDate() >= startDate.getDate());
   if (!anniversaryPassed) years -= 1;
   return Math.max(years, 0);
+}
+
+// عدد الشهور الكاملة من بداية العقد، شامل الشهر الحالي (لأن الأجرة تُدفع مقدماً)
+function calcFullMonthsIncludingCurrent(startDate, today) {
+  const months = (today.getFullYear() - startDate.getFullYear()) * 12
+    + (today.getMonth() - startDate.getMonth()) + 1;
+  return Math.max(months, 0);
+}
+
+// إجمالي التحصيل مع الزيادة السنوية المركبة: مجموع (أجرة كل سنة كاملة × 12 شهر) + شهور السنة الجارية غير المكتملة
+function calcTotalCollectedWithIncrease(startRent, rate, fullYears, startDate, today) {
+  let total = 0;
+  let currentRent = startRent;
+  for (let y = 0; y < fullYears; y++) {
+    total += currentRent * 12;
+    currentRent = currentRent * (1 + rate);
+  }
+  // الشهور من بداية السنة الحالية (بعد آخر زيادة) حتى الشهر الحالي شاملاً
+  const currentYearStart = new Date(startDate);
+  currentYearStart.setFullYear(startDate.getFullYear() + fullYears);
+  const monthsInCurrentYear = (today.getFullYear() - currentYearStart.getFullYear()) * 12
+    + (today.getMonth() - currentYearStart.getMonth()) + 1;
+  if (monthsInCurrentYear > 0) {
+    total += currentRent * monthsInCurrentYear;
+  }
+  return total;
 }
 
 const fieldOrder = ['contractDate', 'startRent', 'increaseRate'];
@@ -293,6 +353,22 @@ calcBtn.addEventListener('click', () => {
   } else {
     lastIncreaseDate.textContent = 'لم يتم تطبيق أي زيادة بعد';
   }
+
+  const totalMonths = calcFullMonthsIncludingCurrent(startDate, today);
+
+  const totalWithIncrease = calcTotalCollectedWithIncrease(startRent, rate, years, startDate, today);
+  totalCollectedValue.textContent = totalWithIncrease.toLocaleString('ar-EG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }) + ' جنيه';
+  totalCollectedSub.textContent = 'عن ' + totalMonths + ' شهر (' + (totalMonths / 12).toFixed(1) + ' سنة تقريباً)';
+
+  const totalFlat = startRent * totalMonths;
+  totalFlatValue.textContent = totalFlat.toLocaleString('ar-EG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }) + ' جنيه';
+  totalFlatSub.textContent = 'عن ' + totalMonths + ' شهر بأجرة ثابتة ' + startRent + ' جنيه';
 });if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('service-worker.js');
